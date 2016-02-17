@@ -29,7 +29,8 @@ selection <- function(parm, index, model, data = NULL,
   
   # initialize internal quantities
   beta.cand.test <- NULL
-  beta <- beta.foo <- model$coef
+  beta <- model$coef
+  beta.foo <- rep(0, p)
   tau.int <- parm
   aic.env <- bic.env <- pval <- 0
   
@@ -41,14 +42,14 @@ selection <- function(parm, index, model, data = NULL,
       matrix(unlist(lapply(1:nrow(cand), FUN = function(k) {
 
         # obtain the eigenspace of interest and the projection
-        # into that eigenspace        
+        # into that eigenspace
         G <- eig.avar.targ$vec[,cand[k,]]
-        P <-  tcrossprod(G)
+        P <-  projection(G)
       
         # build the model matrix Menv
         M <- t(modmat.mat)
-        M2 <- M[(1:p %in% index),]; M2 <- P %*% M2
-        M[(1:p %in% index),] <- M2
+        #M2 <- M[(1:p %in% index),]; M2 <- P %*% M2
+        M[(1:p %in% index),] <- P %*% M[(1:p %in% index),]
         modmat.mat.env <- t(M)
         modmat.int <- array(modmat.mat.env, c(nind, nnode, p))
 
@@ -56,27 +57,37 @@ selection <- function(parm, index, model, data = NULL,
         if(type == "mean-value"){
           tau.env.int <- crossprod(P, parm[index]) 
           tau.int[index] <- tau.env.int
-          beta.foo <- transformUnconditional(parm = tau.int, 
-            modmat.mat.env, data, from = "tau", to = "beta", 
-            offset = offset)
+          ind.int <- max(which(!1:p %in% index)) + length(cand[k,])
+          beta.foo[1:(ind.int)] <- suppressWarnings(try(
+            aster(x, root, pred, fam, modmat = modmat.int, 
+              origin = model$origin, maxiter = 10000)$coef, 
+          silent = TRUE))
+          #beta.foo <- try(transformUnconditional(parm = tau.int, 
+          #  modmat.mat.env, data, from = "tau", to = "beta", 
+          #  offset = offset), silent = TRUE)
+          #print(beta.foo)
         }
-
+        
         if(type == "canonical"){
           beta.foo[index] <- P %*% beta.foo[index]
         }
 
-        # obtain selection criteria values
-        env <-mlogl(beta.foo, pred, fam, x, root, 
-          modmat = modmat.int, type = "unconditional")$value
-        full <-mlogl(beta, pred, fam, x, root, 
-          modmat = modmat, type = "unconditional")$value
-        k <- j*(m-j) + j + j*(j+1)/2 + (m-j)*(m-j+1)/2
-        k.full <- m + m*(m+1)/2
-        LRT <- 2*(env - full)
-        if(j < m) pval <- pchisq(LRT, df = k.full - k, lower.tail = F)
-        if(j == m) pval <- 1
-        bic.env <-2*env + k*log(nind)
-        aic.env <- 2*k + 2*env
+        bic.env <- aic.env <- 1e9
+        pval <- 0
+        if(class(beta.foo) != "try-error"){
+          # obtain selection criteria values
+          env <-mlogl(beta.foo, pred, fam, x, root, 
+            modmat = modmat.int, type = "unconditional")$value
+          full <-mlogl(beta, pred, fam, x, root, 
+            modmat = modmat, type = "unconditional")$value
+          df <- j*(m-j) + j + j*(j+1)/2 + (m-j)*(m-j+1)/2
+          df.full <- m + m*(m+1)/2
+          LRT <- 2*(env - full)
+          if(j < m) pval <- pchisq(LRT, df = df.full - df, lower.tail = F)
+          if(j == m) pval <- 1
+          bic.env <-2*env + df*log(nind)
+          aic.env <- 2*df + 2*env
+        }
         
         things <- c(j, aic.env, bic.env, pval)
         return(things)
@@ -175,3 +186,5 @@ selection <- function(parm, index, model, data = NULL,
   out <- list(aic = aic, bic = bic, LRT = LRT, out = beta.cand.test)
   return(out)
 }
+
+

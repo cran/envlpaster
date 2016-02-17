@@ -31,13 +31,12 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
   modmat.model <- model$modmat
   modmat.mat <- matrix(modmat.model, nrow = n * nnode)
   dimensions <- dim(modmat.model)
-  modelmatrix <- matrix(modmat.model, nrow = n * nnode)
   offset <- as.vector(model$origin)
   
   # obtain tau
   mu <- predict(model, parm.type = "mean.value", 
     model.type = "unconditional")
-  tau <- crossprod(modelmatrix, mu)
+  tau <- crossprod(modmat.mat, mu)
   nuis.ind <- c(1:p)[!index]
   k <- length(index)
   target <- tau[index]
@@ -64,9 +63,9 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
   fulltau[index] <- tau.env
 
   # change the model matrix for the envelope estimator
-  modelmatrix.int <- modelmatrix
+  modelmatrix.int <- modmat.mat
   modelmatrix.int[, index] <- modelmatrix.int[, index] %*% P
-  modmat.model.int <- array(modelmatrix, dimensions)
+  modmat.model.int <- array(modmat.mat, dimensions)
 
   # convert from tau to beta changed from fulltau to tau
   beta.foo <- transformUnconditional(parm = fulltau, 
@@ -102,6 +101,7 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
     amat <- array(amat.mat, dim = c(npop, nnode, p))
   }
 
+
   # initial quantities
   est <- est2 <- est.1d <- matrix(0, nrow = npop, ncol = nboot)
   MLE.tau.boot <- env.tau.boot <- env.1d.tau.boot <- matrix(0, nrow = p, ncol = nboot)
@@ -113,24 +113,28 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
   table <- NULL
 
 
+  #modmat.renew <- model.matrix(m1$formula, data = renewdata)
+  cond <- !(colnames(modmat.renew) %in% model$dropped)
+  modmat.renew <- modmat.renew[, cond]
+  M1.renew <- t(modmat.renew[,-index])
+  M2.renew <- P %*% t(modmat.renew[,index])
+  modmat.env.renew <- t(rbind(M1.renew,M2.renew))
+  data.renew <- asterdata(newdata, vars = vars, pred = pred,
+    group = rep(0, length(vars)), code = code, 
+    families = families)
+  origin.renew <- model$origin[1:npop,]
+  offset.renew <- as.vector(origin.renew)
+
+
+
   # the parametric bootstrap which takes Efron's procedure into account
   for(k in 1:nboot){
 
     # generate a resample of responses from the MLE
     xstar2 <- raster(theta.hat2, pred, fam, root)
 
-    #modmat.renew <- model.matrix(m1$formula, data = renewdata)
-    cond <- !(colnames(modmat.renew) %in% model$dropped)
-    modmat.renew <- modmat.renew[, cond]
-    M1.renew <- t(modmat.renew[,-index])
-    M2.renew <- P %*% t(modmat.renew[,index])
-    modmat.env.renew <- t(rbind(M1.renew,M2.renew))
-    data.renew <- asterdata(newdata, vars = vars, pred = pred,
-      group = rep(0, length(vars)), code = code, 
-      families = families)
-    origin.renew <- model$origin[1:npop,]
-    offset.renew <- as.vector(origin.renew)
-
+    # fit the aster model to the resampled data obtained from 
+    # the MLE of theta
     class(b2) <- class(try(aout4star2 <- aster(xstar2, root, pred,
       fam, modmat.model, parm = beta), silent = TRUE))[1] 
     
@@ -166,19 +170,8 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
     # envelope estimator
     xstar <- raster(theta.hat, pred, fam, root)
 
-    #modmat.renew <- model.matrix(m1$formula, data = renewdata)
-    cond <- !(colnames(modmat.renew) %in% model$dropped)
-    modmat.renew <- modmat.renew[, cond]
-    M1.renew <- t(modmat.renew[,-index])
-    M2.renew <- P %*% t(modmat.renew[,index])
-    modmat.env.renew <- t(rbind(M1.renew,M2.renew))
-    data.renew <- asterdata(newdata, vars = vars, pred = pred,
-      group = rep(0, length(vars)), code = code, 
-      families = families)
-    origin.renew <- model$origin[1:npop,]
-    offset.renew <- as.vector(origin.renew)
-
-
+    # fit the aster model to the resampled data obtained from 
+    # the envelope estimator of theta
     class(b2) <- class(try(aout4star2 <- aster(xstar, root, pred,
       fam, modmat.model.int, parm = beta), silent = TRUE))[1] 
     
@@ -198,6 +191,14 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
         fam, modmat.model.int, method = "nlm"), silent = TRUE))[1] 
     }
 
+
+    # MLE of expected Darwinian fitness
+    tau.renew <- transformUnconditional(aout4star2$coef, data,
+      modmat = modelmatrix.int, from = "beta", to = "tau",
+      offset = offset)
+    #phi.MLE.renew <- offset.renew + modmat.renew %*% aout4star2$coef
+    #mu.MLE.renew <- transformSaturated(parm = phi.MLE.renew, 
+    #  data.renew, from = "phi", to = "mu")
 
     # selection of the envelope dimension using the 1d algorithm
     barbaz <- NULL
@@ -287,7 +288,10 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
         Dar.fit.env.1d <- amat.mat %*% mu.env.renew 
       }
 
-      if(dim.1d == length(index)) P.1d.list[[k]] <- diag(length(index))
+      if(dim.1d == length(index)){ 
+        P.1d.list[[k]] <- diag(length(index))
+        env.1d.tau.boot[, k] <- tau.renew
+      }
     }
 
 
@@ -318,9 +322,7 @@ fit.boot.Efron <- function(model, nboot, index, vectors = NULL, dim = NULL,
   }
 
   return(out)
-
 }
-
 
 
 

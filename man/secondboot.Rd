@@ -149,9 +149,13 @@
   \emph{Journal of Computational and Graphical Statistics}, 
   Published online. \doi{10.1080/10618600.2015.1029577}.
 
-  Eck, D. J., Geyer, C. J., and Cook, R. D. (2015).
+  Eck, D. J., Geyer, C. J., and Cook, R. D. (2016).
   Enveloping the aster model.
-  \eqn{\emph{in preparation}}.
+  \eqn{\emph{in prep}}.
+
+  Eck, D.~J., Geyer, C.~J., and Cook, R.~D. (2016).
+  Web-based Supplementary Materials for ``Enveloping the aster model.''
+  \eqn{\emph{in prep}}.
 
   Efron, B. (2014).
   Estimation and Accuracy After Model Selection.
@@ -159,5 +163,5 @@
 }
 
 \examples{
-### see tech report ###
+### Web-based Supplementary Materials for ``Enveloping the aster model.'' ###
 }

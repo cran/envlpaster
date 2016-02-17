@@ -30,6 +30,10 @@ secondboot <- function(k, nboot2, out, model, index, data, amat,
   n <- nrow(model$x)
   nnode <- ncol(model$x)
   modmat.mat <- matrix(model$modmat, nrow = n * nnode)
+  mu <- predict(model, parm.type = "mean.value", 
+    model.type = "unconditional")
+  #tau <- crossprod(modmat.mat, mu)
+  tau <- MLE.tau.boot[, k]
   offset <- as.vector(model$origin)
   code <- data$code
   families <- data$families
@@ -113,12 +117,11 @@ secondboot <- function(k, nboot2, out, model, index, data, amat,
   MLE.tau.boot.subsample <- matrix(0, nrow = p, ncol = nboot2)
   sd.Efron <- 0
 
-
-  # generate many new resamples  
+  # generate many new resamples    
   for(j in 1:nboot2){
 
     xstar.samp <- raster(theta.samp, pred, fam, root)
-
+    
     # fit the aster model using the secondary generated data
     class(b2) <- class(try(aout4star2 <- aster(xstar.samp, root, 
       pred, fam, model$modmat, parm = beta), silent = TRUE))[1]
@@ -153,8 +156,8 @@ secondboot <- function(k, nboot2, out, model, index, data, amat,
     Sigma.uu <- aout4star2$fisher[index, index]
     if(method == "eigen"){
       if(length(vectors.foo) < length(index)){
-        Gamma.2nd <- eigen(Sigma.uu)$vec[, vectors.foo]
-        P.2nd <- Gamma.2nd %*% t(Gamma.2nd)
+        Gamma.2nd <- eigen(Sigma.uu, symmetric = TRUE)$vec[, vectors.foo]
+        P.2nd <- projection(Gamma.2nd)
         M.2nd[, index] <- M.2nd[, index] %*% P.2nd
       }
       if(length(vectors.foo) == length(index)){
@@ -173,11 +176,13 @@ secondboot <- function(k, nboot2, out, model, index, data, amat,
         M.2nd[, index] <- M.foo[, index] %*% P.2nd  
       }
     }
-    
+
+
     tau.env.star <- crossprod(M.2nd, mu.star)
     beta.env.star <- transformUnconditional(parm = tau.env.star, 
       M.2nd, data, from = "tau", to = "beta", 
       offset = offset)
+
 
     # compute the envelope estimator of expected 
     # Darwinian fitness
@@ -186,36 +191,24 @@ secondboot <- function(k, nboot2, out, model, index, data, amat,
       modmat.env.renew, data.renew, from = "beta", to = "mu", 
       offset = offset.renew)
     est.env.subsample[, j] <- (amat.mat %*% mu.env.renew)
+    M.2nd <- M.foo
 
     # store the canonical statistic value
     MLE.tau.boot.subsample[, j] <- tau.env.star
 
-    # compute the Efron sd estimator
+    # compute the Efron sd estimator99i5
     if(j == nboot2){ 
 
+      B <- t(MLE.tau.boot.subsample - rowSums(MLE.tau.boot.subsample)/nboot2)
+      V <- (t(B) %*% B) / nboot2;  eig.V <- eigen(V)
+      env.centered <- t(est.env.subsample - fit.foo)
+      cov <- t(B) %*% env.centered / nboot2
 
-      MLE.centered <- MLE.tau.boot.subsample - rowSums(MLE.tau.boot.subsample)/nboot2
-      env.centered <- est.env.subsample - fit.foo
-
-      V <- (MLE.centered %*% t(MLE.centered)) / nboot2
-      eig.V <- eigen(V)
-      cov <- (MLE.centered %*% t(env.centered)) / nboot2
       var.Efron <- t(cov) %*% eig.V$vec %*% diag(1/eig.V$val) %*% 
         t(eig.V$vec) %*% cov
       sd.Efron <- sqrt(diag(var.Efron))
     }
-
   }
-
-
-  # bootstrapped standard error
-  #Delta1 <- (est.env.subsample[, 1] %o% est.env.subsample[, 1]) / nboot2
-  #for(j in 2:nboot2){ 
-  #  Delta1 <- Delta1 + (est.env.subsample[, j] %o% 
-  #    est.env.subsample[, j]) / nboot2
-  #}
-  #ratio <- sqrt(diag(S2)) / sqrt(diag(Delta1))
-
 
   ### output 
   out <- list(sd.Efron = sd.Efron, cov = cov, V = V, 
@@ -223,6 +216,7 @@ secondboot <- function(k, nboot2, out, model, index, data, amat,
     est.env.subsample = est.env.subsample)
   return(out)
 }
+
 
 
 

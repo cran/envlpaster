@@ -101,9 +101,9 @@
 }
 
 \references{
-  Eck, D. J., Geyer, C. J., and Cook, R. D. (2015).
+  Eck, D. J., Geyer, C. J., and Cook, R. D. (2016).
   Enveloping the aster model.
-  \eqn{\emph{in preperation}}.
+  \eqn{\emph{in prep}}.
 }
 
 \examples{

@@ -91,9 +91,9 @@
   \emph{Journal of Computational and Graphical Statistics}, 
   Published online. \doi{10.1080/10618600.2015.1029577}.
   
-  Eck, D. J., Geyer, C. J., and Cook, R. D. (2015).
+  Eck, D. J., Geyer, C. J., and Cook, R. D. (2016).
   Enveloping the aster model.
-  \emph{in preparation}.
+  \emph{in prep}.
 }
 
 \examples{
